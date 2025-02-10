@@ -1,0 +1,236 @@
+#  C++ std::mutex 的定义与功能作用
+## 定义： 
+**std::mutex** 是 C++ 标准库提供的一种用于多线程编程的互斥量（mutex）。它定义在头文件 <mutex> 中，主要用于保护共享数据，防止多个线程同时访问而引发数据竞争。
+
+## std::mutex种类
+
+**std::mutex**是一种线程同步的手段，用于保存多线程同时操作的共享数据。
+
+**mutex**分为四种：
+
+**std::mutex**：独占的互斥量，不能递归使用，不带超时功能
+
+**std::recursive_mutex**：递归互斥量，可重入，不带超时功能
+
+**std::timed_mutex**：带超时的互斥量，不能递归
+
+**std::recursive_timed_mutex**：带超时的互斥量，可以递归使用
+
+## 功能作用：
+
+1. 保证线程对共享资源的互斥访问。
+2. 提供加锁和解锁操作，以确保只有一个线程可以访问某段代码或数据。
+3. 在多线程环境中，通过避免数据竞争（data race）来保护数据完整性。
+
+## 常用成员函数
+**lock()**：加锁。如果已经上锁，调用线程会阻塞直到锁被释放。
+**try_lock()**：尝试加锁，成功返回 true，失败返回 false。
+**unlock()**：解锁，释放锁以便其他线程获取。
+
+## std::mutex 参考代码一
+
+以下代码展示了如何使用 std::mutex 来保护共享资源，确保多个线程安全地访问和修改。
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+
+// 共享资源和互斥量
+int shared_counter = 0;
+std::mutex mtx;
+
+// 线程函数：对共享资源进行访问
+void increment(int id, int times) {
+    for (int i = 0; i < times; ++i) {
+        // 加锁保护共享资源
+        mtx.lock();
+        ++shared_counter;
+        std::cout << "Thread " << id << " incremented counter to " << shared_counter << std::endl;
+        mtx.unlock();
+        
+        // 模拟其他操作
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+int main() {
+    // 创建多个线程
+    std::thread t1(increment, 1, 5);
+    std::thread t2(increment, 2, 5);
+
+    // 等待线程完成
+    t1.join();
+    t2.join();
+
+    std::cout << "Final counter value: " << shared_counter << std::endl;
+
+    return 0;
+}
+
+```
+
+## std::mutex 参考代码一输出结果
+
+```cpp
+Thread 1 incremented counter to 3
+Thread 2 incremented counter to 4
+Thread 1 incremented counter to 5
+Thread 2 incremented counter to 6
+Thread 1 incremented counter to 7
+Thread 2 incremented counter to 8
+Thread 1 incremented counter to 9
+Thread 2 incremented counter to 10
+Final counter value: 10
+```
+
+## 代码运行说明
+
+**加锁和解锁：**
+
+线程每次访问共享变量 shared_counter 时，必须先加锁（mtx.lock()），完成后解锁（mtx.unlock()）。
+如果某个线程已经持有锁，其他线程将被阻塞，直到锁被释放。
+
+## 优化使用（RAII）
+
+手动调用 lock 和 unlock 存在风险，比如某些异常情况可能导致忘记解锁。可以使用 std::lock_guard 或 std::unique_lock，它们基于 RAII（资源获取即初始化）机制，自动管理锁。
+
+```cpp
+void increment_safe(int id, int times) {
+    for (int i = 0; i < times; ++i) {
+        std::lock_guard<std::mutex> guard(mtx); // 自动加锁与解锁
+        ++shared_counter;
+        std::cout << "Thread " << id << " incremented counter to " << shared_counter << std::endl;
+    }
+}
+
+```
+
+使用 std::lock_guard 会自动释放锁，无需手动调用 unlock()，推荐这种方式。
+
+## std::mutex参考优化代码二
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+
+// 共享资源和互斥量
+int shared_counter = 0;
+std::mutex mtx;
+
+// 线程函数：对共享资源进行访问
+void increment(int id, int times) {
+    for (int i = 0; i < times; i++) {
+        std::lock_guard<std::mutex> guard(mtx); // 自动加锁与解锁
+        ++shared_counter;
+        std::cout << "Thread " << id << " incremented counter to " << shared_counter << std::endl;
+    }
+}
+
+int main() {
+    // 创建多个线程
+    std::thread t1(increment, 1, 5);
+    std::thread t2(increment, 2, 5);
+
+    // 等待线程完成
+    t1.join();
+    t2.join();
+
+    std::cout << "Final counter value: " << shared_counter << std::endl;
+
+    return 0;
+}
+
+```
+
+## std::mutex参考优化代码二输出结果
+```cpp
+Thread 1 incremented counter to 1
+Thread 1 incremented counter to 2
+Thread 1 incremented counter to 3
+Thread 1 incremented counter to 4
+Thread 1 incremented counter to 5
+Thread 2 incremented counter to 6
+Thread 2 incremented counter to 7
+Thread 2 incremented counter to 8
+Thread 2 incremented counter to 9
+Thread 2 incremented counter to 10
+Final counter value: 10
+```
+
+## std::mutex参考代码三
+```cpp
+#include <iostream>
+#include <mutex>
+#include <thread>
+
+using namespace std;
+std::mutex mtx;
+
+int main() {
+    auto func = [](int k) {
+        mtx.lock();
+        for (int i = 0; i < k; ++i) {
+            cout << i << " ";
+        }
+        cout << endl;
+        mtx.unlock();
+    };
+    std::thread threads[3];
+    for (int i = 0; i < 3; ++i) {
+        threads[i] = std::thread(func, 3);
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+    return 0;
+}
+```
+
+## std::mutex参考代码三输出结果
+
+```cpp
+0 1 2 
+0 1 2 
+0 1 2```
+
+## std::mutex参考代码四
+```cpp
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <chrono>
+
+using namespace std;
+std::timed_mutex timed_mtx;
+
+int main() {
+    auto func = [](int k) {
+        timed_mtx.try_lock_for(std::chrono::milliseconds(200));
+        for (int i = 0; i < k; ++i) {
+            cout << i << " ";
+        }
+        cout << endl;
+        timed_mtx.unlock();
+    };
+    std::thread threads[5];
+    for (int i = 0; i < 5; ++i) {
+        threads[i] = std::thread(func, 10);
+    }
+    for (auto& th : threads) {
+        th.join();
+    }
+    return 0;
+}
+```
+
+## std::mutex参考代码五输出结果
+
+```cpp
+0 1 2 3 4 
+0 1 2 3 4 
+0 1 2 3 4 
+0 1 2 3 4 
+0 1 2 3 4 
+```
