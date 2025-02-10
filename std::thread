@@ -1,0 +1,250 @@
+# C++ std::thread的定义和功能
+
+**std::thread**是C++11引入的标准库类，用于创建和管理线程。通过std::thread，程序可以并发执行多个任务，从而提高效率。
+
+## 功能与作用：
+
+1. **创建线程**：可以启动一个线程执行某个函数或任务。
+2. **管理线程**：允许主线程与子线程进行交互，如等待线程结束（join()）或分离线程（detach()）。
+3. **提高性能**：利用多核处理器的能力并行处理。
+
+**主要成员函数**：
+1. std::thread::join(): 阻塞调用线程，直到被管理线程完成。
+2. std::thread::detach(): 分离线程，使其在后台运行。
+3. std::thread::joinable(): 检查线程是否可被join()或detach()。
+
+
+## std::thread 参考代码一
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <chrono>
+
+// 模拟任务函数
+void print_numbers(const std::string& thread_name, int start, int end) {
+    for (int i = start; i <= end; ++i) {
+        std::cout << thread_name << " prints: " << i << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 模拟延迟
+    }
+}
+
+int main() {
+    std::cout << "Main thread starts." << std::endl;
+
+    // 创建两个线程
+    std::thread thread1(print_numbers, "Thread 1", 1, 5);
+    std::thread thread2(print_numbers, "Thread 2", 6, 10);
+
+    // 检查线程是否joinable
+    if (thread1.joinable() && thread2.joinable()) {
+        std::cout << "Both threads are joinable." << std::endl;
+    }
+
+    // 主线程等待子线程结束
+    thread1.join();
+    thread2.join();
+
+    std::cout << "All threads completed. Main thread exits." << std::endl;
+    return 0;
+}
+
+```
+
+
+## std::thread 参考代码一输出结果
+运行后程序会交替打印两个线程的输出：
+```cpp
+Main thread starts.
+Both threads are joinable.
+Thread 1 prints: 1
+Thread 2 prints: 6
+Thread 1 prints: 2
+Thread 2 prints: 7
+Thread 1 prints: 3
+Thread 2 prints: 8
+Thread 1 prints: 4
+Thread 2 prints: 9
+Thread 2Thread 1 prints:  prints: 105
+
+All threads completed. Main thread exits.
+```
+
+**备注：**
+Linux 系统通过 **g++ thread.cpp -o thread -lpthread** 进行编译
+
+
+## 代码一分析
+1. **std::thread对象的创建：**
+
+```cpp
+std::thread thread1(print_numbers, "Thread 1", 1, 5);
+
+```
+启动线程thread1，执行print_numbers函数，传递参数。
+
+**2. 等待线程结束：**
+
+```cpp
+thread1.detach();
+```
+join()阻塞主线程，直到thread1完成。
+
+**3. 分离线程（可选）：**
+
+```cpp
+thread1.detach();
+```
+线程独立运行，不再由主线程管理。
+
+**4. 线程同步：** 
+使用std::cout时，为了避免多线程输出交错，可以加锁（未示范）。
+
+
+## std::thread 参考代码二
+
+```cpp
+#include <iostream>
+#include <thread>
+
+using namespace std;
+
+int main() {
+    auto func1 = []() {
+        for (int i = 0; i < 10; ++i) {
+            cout << i << " ";
+        }
+        cout << endl;
+    };
+    std::thread t1(func1);
+    if (t1.joinable()) {
+        t1.detach();
+    }
+    auto func2 = [](int k) {
+        for (int i = 0; i < k; ++i) {
+            cout << i << " ";
+        }
+        cout << endl;
+    };
+    std::thread t2(func2, 20);
+    if (t2.joinable()) { // 检查线程可否被join
+        t2.join();
+    }
+    return 0;
+}
+```
+
+## std::thread 参考代码二输出结果
+
+```cpp
+0 1 2 3 4 5 6 7 8 9 
+0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
+```
+## 代码二分析
+
+上述代码中，函数func1和func2运行在线程对象t1和t2中，从刚创建对象开始就会新建一个线程用于执行函数，调用join函数将会阻塞主线程，直到线程函数执行结束，线程函数的返回值将会被忽略。如果不希望线程被阻塞执行，可以调用线程对象的detach函数，表示将线程和线程对象分离。
+
+如果没有调用join或者detach函数，假如线程函数执行时间较长，此时线程对象的生命周期结束调用析构函数清理资源，这时可能会发生错误，这里有两种解决办法，一个是调用join()，保证线程函数的生命周期和线程对象的生命周期相同，另一个是调用detach()，将线程和线程对象分离，这里需要注意，如果线程已经和对象分离，那就再也无法控制线程什么时候结束了，不能再通过join来等待线程执行完。
+
+
+下面是对thread进行封装，避免没有调用join或者detach可导致程序出错的情况出现：
+## std::thread 参考代码三
+
+```cpp
+#include <iostream>
+#include <thread>
+
+class ThreadGuard {
+    public:
+    enum class DesAction { join, detach };
+
+    ThreadGuard(std::thread&& t, DesAction a) : t_(std::move(t)), action_(a){};
+
+    ~ThreadGuard() {
+        if (t_.joinable()) {
+            if (action_ == DesAction::join) {
+                t_.join();
+            } else {
+                t_.detach();
+            }
+        }
+    }
+
+    ThreadGuard(ThreadGuard&&) = default;
+    ThreadGuard& operator=(ThreadGuard&&) = default;
+
+    std::thread& get() { return t_; }
+
+    private:
+    std::thread t_;
+    DesAction action_;
+};
+
+int main() {
+    ThreadGuard t(std::thread([]() {
+        for (int i = 0; i < 10; ++i) {
+            std::cout << "thread guard " << i << " " << std::endl;
+        }
+        std::cout << std::endl;}), ThreadGuard::DesAction::join);
+    return 0;
+}
+```
+
+
+## std::thread 参考代码三输出结果
+
+```cpp
+thread guard 0 
+thread guard 1 
+thread guard 2 
+thread guard 3 
+thread guard 4 
+thread guard 5 
+thread guard 6 
+thread guard 7 
+thread guard 8 
+thread guard 9 
+```
+
+
+C++11还提供了获取线程id，或者系统cpu个数，获取thread native_handle，使得线程休眠等功能
+## std::thread 参考代码四
+
+```cpp
+#include <iostream>
+#include <thread>
+
+using namespace std;
+
+int main()
+{
+    auto func = []()
+    {
+        for (int i = 0; i < 10; ++i)
+        {
+            cout << i << " ";
+        }
+        cout << endl;
+    };
+
+    std::thread t(func);
+    if (t.joinable()){
+        t.detach();
+    }
+    cout << "当前线程ID " << t.get_id() << endl;
+    cout << "当前cpu个数 " << std::thread::hardware_concurrency() << endl;
+    auto handle = t.native_handle(); // handle可用于pthread相关操作
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    return 0;
+}
+```
+
+## std::thread 参考代码四输出结果
+
+```cpp
+当前线程ID thread::id of a non-executing thread
+当前cpu个数 4
+0 1 2 3 4 5 6 7 8 9 
+```
+
+
