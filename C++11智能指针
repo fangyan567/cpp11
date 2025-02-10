@@ -1,0 +1,245 @@
+# C++11智能指针种类
+
+在 C++11 中，智能指针是用来管理动态分配内存的类模板，它可以避免手动管理内存中的指针，减少内存泄漏的风险。C++11 引入了三种常用的智能指针类型：
+
+## 1. std::unique_ptr
+
+独占所有权的智能指针，只能有一个 unique_ptr 拥有资源的所有权。当 unique_ptr 超出作用域时，资源会被自动释放。
+unique_ptr是一个独占所有权的智能指针，意味着同一时间内，只有一个unique_ptr可以指向某个对象。当unique_ptr超出作用域时，它会自动销毁它所指向的对象。
+
+```cpp
+#include <iostream>
+#include <memory> // 引入 unique_ptr
+
+class Test {
+public:
+    Test() { std::cout << "Test constructor\n"; }
+    ~Test() { std::cout << "Test destructor\n"; }
+
+    void say_hello() { std::cout << "Hello from Test\n"; }
+};
+
+int main() {
+    // 使用 unique_ptr 创建一个对象
+    std::unique_ptr<Test> p1 = std::make_unique<Test>();
+    p1->say_hello();
+
+    // unique_ptr 转移所有权
+    std::unique_ptr<Test> p2 = std::move(p1); // 这里 p1 失去所有权
+
+    // 不能再使用 p1，因为它的所有权已被转移
+    //p1->say_hello(); // 错误
+
+    p2->say_hello();
+
+    // p2 离开作用域时，Test 对象会被销毁
+    return 0;
+}
+
+```
+
+
+std::unique_ptr输出结果
+
+```cpp
+Test constructor
+Hello from Test
+Hello from Test
+Test destructor
+```
+
+## 2. std::shared_ptr
+
+共享所有权的智能指针，多个 shared_ptr 可以共享同一个资源。当最后一个 shared_ptr 被销毁时，资源才会被释放。
+
+std::shared_ptr参考代码
+
+```cpp
+#include <iostream>
+#include <memory> // 引入 shared_ptr
+
+class Test {
+public:
+    Test() { std::cout << "Test constructor\n"; }
+    ~Test() { std::cout << "Test destructor\n"; }
+
+    void say_hello() { std::cout << "Hello from Test\n"; }
+};
+
+int main() {
+    // 创建 shared_ptr
+    std::shared_ptr<Test> p1 = std::make_shared<Test>();
+    p1->say_hello();
+
+    // 共享所有权
+    std::shared_ptr<Test> p2 = p1;
+    std::cout << "Use count: " << p1.use_count() << "\n"; // 2
+
+    // p1 和 p2 都指向同一个对象
+    p2->say_hello();
+
+    // p1 和 p2 都离开作用域时，对象会被销毁
+    return 0;
+}
+
+```
+
+std::shared_ptr输出结果
+
+```cpp
+Test constructor
+Hello from Test
+Use count: 2
+Hello from Test
+Test destructor
+```
+
+
+## 3. std::weak_ptr
+
+不拥有资源的智能指针，它与 shared_ptr 配合使用，用来解决循环引用的问题。weak_ptr 不会影响资源的引用计数。
+
+std::weak_ptr参考代码
+
+```cpp
+#include <iostream>
+#include <memory> // 引入 weak_ptr
+
+class Test {
+public:
+    Test() { std::cout << "Test constructor\n"; }
+    ~Test() { std::cout << "Test destructor\n"; }
+
+    void say_hello() { std::cout << "Hello from Test\n"; }
+};
+
+int main() {
+    // 创建 shared_ptr
+    std::shared_ptr<Test> p1 = std::make_shared<Test>();
+    p1->say_hello();
+
+    // 创建 weak_ptr 观察 p1
+    std::weak_ptr<Test> w1 = p1;
+
+    // weak_ptr 不增加引用计数，因此它不会阻止对象销毁
+    std::cout << "p1.use_count(): " << p1.use_count() << "\n"; // 1
+    std::cout << "w1.use_count(): " << w1.use_count() << "\n"; // 1
+
+    if (auto p2 = w1.lock()) { // lock 返回一个 shared_ptr
+        p2->say_hello();
+        std::cout << "p1.use_count(): " << p1.use_count() << "\n"; // 2
+        std::cout << "w1.use_count(): " << w1.use_count() << "\n"; // 2
+    } else {
+        std::cout << "Object has been destroyed\n";
+    }
+
+    // p1 离开作用域时，Test 对象会被销毁
+    return 0;
+}
+
+```
+
+std::weak_ptr输出结果
+
+```cpp
+Test constructor
+Hello from Test
+p1.use_count(): 1
+w1.use_count(): 1
+Hello from Test
+p1.use_count(): 2
+w1.use_count(): 2
+Test destructor
+```
+
+
+## 三种智能指针用法
+
+下面是一个完整的 C++ 代码示例，展示了这三种智能指针的用法
+
+C++11智能指针参考代码
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <vector>
+
+class MyClass {
+public:
+    MyClass(int value) : value_(value) {
+        std::cout << "MyClass(" << value_ << ") created.\n";
+    }
+    
+    ~MyClass() {
+        std::cout << "MyClass(" << value_ << ") destroyed.\n";
+    }
+    
+    void display() const {
+        std::cout << "Value: " << value_ << "\n";
+    }
+
+private:
+    int value_;
+};
+
+int main() {
+    // 1. 使用 unique_ptr，独占所有权
+    {
+        std::unique_ptr<MyClass> uniquePtr = std::make_unique<MyClass>(10);
+        uniquePtr->display(); // 调用成员函数
+        
+        // uniquePtr 在作用域结束时自动释放内存
+    } // uniquePtr 离开作用域，内存自动释放
+
+    // 2. 使用 shared_ptr，多个智能指针共享资源
+    {
+        std::shared_ptr<MyClass> sharedPtr1 = std::make_shared<MyClass>(20);
+        std::cout << "Shared Pointer Count: " << sharedPtr1.use_count() << std::endl; // 使用计数
+        {
+            std::shared_ptr<MyClass> sharedPtr2 = sharedPtr1;  // 共享所有权
+            std::cout << "Shared Pointer Count: " << sharedPtr1.use_count() << std::endl;
+            sharedPtr2->display();
+        }
+        // sharedPtr2 离开作用域，sharedPtr1 仍然持有资源
+        
+        std::cout << "Shared Pointer Count: " << sharedPtr1.use_count() << std::endl; // 最后 sharedPtr1 自动释放
+    }
+
+    // 3. 使用 weak_ptr，避免循环引用
+    {
+        std::shared_ptr<MyClass> sharedPtr1 = std::make_shared<MyClass>(30);
+        std::weak_ptr<MyClass> weakPtr = sharedPtr1;  // weak_ptr 不增加引用计数
+        std::cout << "11 Shared Pointer Count: " << sharedPtr1.use_count() << std::endl;
+        
+        if (auto locked = weakPtr.lock()) {  // lock() 返回一个 shared_ptr
+            locked->display();
+            std::cout << "22 Shared Pointer Count: " << sharedPtr1.use_count() << std::endl;
+        } else {
+            std::cout << "Object is no longer available.\n";
+        }
+    }
+
+    return 0;
+}
+
+```
+
+
+C++11智能指针输出结果
+
+```cpp
+Value: 10
+MyClass(10) destroyed.
+MyClass(20) created.
+Shared Pointer Count: 1
+Shared Pointer Count: 2
+Value: 20
+Shared Pointer Count: 1
+MyClass(20) destroyed.
+MyClass(30) created.
+11 Shared Pointer Count: 1
+Value: 30
+22 Shared Pointer Count: 2
+MyClass(30) destroyed.
+```
+
