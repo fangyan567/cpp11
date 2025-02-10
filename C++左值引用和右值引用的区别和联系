@@ -1,0 +1,216 @@
+# 左值引用和右值引用
+
+在C++中，左值（lvalue）和右值（rvalue）是两种不同类型的表达式，它们在内存中的位置和生命周期上有所不同。左值通常表示一个持久的对象，可以位于内存中的某个位置，并且可以被多次引用；而右值通常是临时的对象或字面量，它们通常没有持久的存储位置。
+
+## 左值引用和右值引用的区别
+
+### 左值引用
+
+1. 引用一个持久的对象。
+2. 必须被初始化且一旦被初始化后，不能改变引用的对象。
+3. 使用&符号定义。
+
+
+###  左值引用参考代码
+
+```cpp
+#include <iostream>
+#include <string>
+
+void printLvalue(const std::string& lvalueRef) {
+    std::cout << "Lvalue: " << lvalueRef << std::endl;
+}
+
+int main() {
+    std::string str = "Hello, World!";
+    printLvalue(str);  // 传递左值引用
+    return 0;
+}**
+```
+
+###  左值引用参考代码输出结果
+
+```cpp
+Lvalue: Hello, World!
+```
+
+### 左值引用总结
+在这个例子中，str是一个左值，printLvalue函数接受一个左值引用参数lvalueRef，并打印出字符串内容。
+
+### 右值引用
+
+1. 引用一个临时的对象或字面量。
+2. 允许移动语义，可以优化资源管理（如动态分配的内存）。
+3. 使用&&符号定义。
+
+
+### 右值引用参考代码
+
+```cpp
+#include <iostream>
+#include <string>
+#include <utility>  // for std::move
+
+void printRvalue(std::string&& rvalueRef) {
+    std::cout << "Rvalue: " << rvalueRef << std::endl;
+    // rvalueRef = "Another string"; // 错误：右值引用不能重新绑定到另一个对象
+}
+
+int main() {
+    std::string str = "Hello, World!";
+    printRvalue(std::move(str));  // 使用std::move将str转换为右值引用
+    // 注意：std::move之后，str的状态是未定义的（但通常仍然可以使用，只是内容可能已改变）
+    std::cout << "After std::move: " << str << std::endl;  // 输出可能是未定义的，但通常不会崩溃
+
+    // 直接传递右值
+    printRvalue("Temporary string");
+    
+    return 0;
+}
+```
+
+
+### 右值引用参考代码输出结果
+
+```cpp
+Rvalue: Hello, World!
+After std::move: Hello, World!
+Rvalue: Temporary string
+```
+
+### 右值引用总结
+在这个例子中，std::move(str)将str转换为右值引用，并传递给printRvalue函数。注意，std::move并不移动数据，它只是将左值转换为右值引用，从而允许函数使用移动语义（如果函数支持的话）。直接传递字符串字面量"Temporary string"也是右值引用的一种情况。
+
+## 左值引用和右值引用的联系
+类型安全：左值引用和右值引用都保持了类型安全，确保引用的是正确的对象类型。
+避免拷贝：通过引用传递（无论是左值还是右值引用），可以避免不必要的对象拷贝，从而提高性能。
+移动语义：右值引用是实现移动语义的关键，允许在资源管理上进行优化，如动态内存、文件句柄等的转移而不是拷贝。
+
+
+## 右值引用（Rvalue References）的完整代码
+
+代码包括了右值引用的基本概念、std::move、以及如何使用右值引用实现移动语义：
+
+###  右值引用完整代码
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+class MyClass {
+public:
+    int* data;
+    
+    // 默认构造函数
+    MyClass() : data(new int[100]) {
+        std::cout << "Default Constructor\n";
+    }
+    
+    // 带参数的构造函数
+    MyClass(int val) : data(new int[100]) {
+        std::cout << "Parameterized Constructor\n";
+        data[0] = val;
+    }
+    
+    // 移动构造函数 (右值引用)
+    MyClass(MyClass&& other) noexcept : data(other.data) {
+        std::cout << "Move Constructor\n";
+        other.data = nullptr;  // 防止原对象的内存被析构
+    }
+    
+    // 移动赋值运算符 (右值引用)
+    MyClass& operator=(MyClass&& other) noexcept {
+        std::cout << "Move Assignment Operator\n";
+        if (this != &other) {
+            delete[] data;        // 释放当前对象的数据
+            data = other.data;    // 转移资源
+            other.data = nullptr; // 置空源对象
+        }
+        return *this;
+    }
+    
+    // 拷贝构造函数
+    MyClass(const MyClass& other) : data(new int[100]) {
+        std::cout << "Copy Constructor\n";
+        std::copy(other.data, other.data + 100, data);
+    }
+    
+    // 析构函数
+    ~MyClass() {
+        delete[] data;
+        std::cout << "Destructor\n";
+    }
+    
+    // 打印数据
+    void print() const {
+        if (data) {
+            std::cout << "Data: " << data[0] << "\n";
+        } else {
+            std::cout << "Data is nullptr\n";
+        }
+    }
+};
+
+int main() {
+    MyClass obj1(42);            // 调用参数化构造函数
+    MyClass obj2 = std::move(obj1); // 调用移动构造函数
+
+    obj2.print(); // 输出: Data: 42
+    obj1.print(); // 输出: Data is nullptr
+
+    MyClass obj3;
+    obj3 = std::move(obj2);      // 调用移动赋值运算符
+
+    obj3.print(); // 输出: Data: 42
+    obj2.print(); // 输出: Data is nullptr
+
+    // 使用vector示范移动语义
+    std::vector<MyClass> vec;
+    vec.push_back(MyClass(100));  // Move发生在这里
+    
+    return 0;
+}
+
+```
+
+
+### 右值引用完整代码输出结果
+
+```cpp
+Parameterized Constructor
+Move Constructor
+Data: 42
+Data is nullptr
+Default Constructor
+Move Assignment Operator
+Data: 42
+Data is nullptr
+Parameterized Constructor
+Move Constructor
+Destructor
+Destructor
+Destructor
+Destructor
+Destructor
+```
+
+
+## 右值引用完整代码解析
+### 构造函数
+默认构造函数：分配内存并初始化。
+带参数构造函数：给对象赋初值。
+拷贝构造函数：进行深拷贝操作。
+移动构造函数：将资源（内存、数据）从临时对象转移到新对象中，并将临时对象的数据指针置空。
+
+### 移动赋值运算符
+使用 std::move 将一个右值对象的资源转移到当前对象，并释放当前对象的资源。
+
+### 析构函数
+释放动态分配的内存。
+### std::move
+std::move 并不真正移动对象，它只是将左值转化为右值引用，从而启用移动语义。
+
+### 避免段错误
+在 print() 中添加了一个检查，避免在空指针情况下访问数据。
+移动构造函数中的 other.data 被置为 nullptr，以防止原对象的内存被不小心访问或销毁。
