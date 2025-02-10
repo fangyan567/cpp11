@@ -1,0 +1,97 @@
+# C++ std::atomic
+## C++ 中 std::atomic 的定义及功能
+std::atomic 是 C++ 标准库中提供的一种模板类，主要用于实现 原子操作，以保证多线程环境下对共享变量的安全操作。它提供了一种无需使用互斥锁即可安全访问共享数据的机制，避免了竞争条件。
+
+## 特点
+1. 线程安全：多个线程同时对同一变量进行读写操作时，std::atomic 保证操作的原子性。
+2. 性能优越：相比互斥锁，std::atomic 的性能更优，尤其在读多写少的情况下。
+3. 无锁实现：底层通常通过硬件支持的原子操作（如 CAS 操作）实现。
+## 常用操作`在这里插入代码片`
+1. 原子加载与存储：load() 和 store()
+2. 原子交换：exchange()
+3. 比较并交换（CAS）：compare_exchange_weak() 和 compare_exchange_strong()
+4. 原子加减：fetch_add()、fetch_sub()
+5. 内存顺序控制：memory_order
+
+
+## 参考代码
+下面展示一个使用 std::atomic 的完整例子，演示如何在多线程环境下对共享变量进行安全访问。
+
+```cpp
+#include <iostream>
+#include <atomic>
+#include <thread>
+#include <vector>
+
+// 全局原子变量
+std::atomic<int> counter(0);
+
+// 工作线程函数
+void increment(int num_iterations) {
+    for (int i = 0; i < num_iterations; ++i) {
+        // 原子递增操作
+        counter.fetch_add(1, std::memory_order_relaxed);
+    }
+}
+
+int main() {
+    const int num_threads = 10;         // 线程数
+    const int num_iterations = 1000;   // 每个线程的迭代次数
+
+    // 存储线程对象的容器
+    std::vector<std::thread> threads;
+
+    // 创建多个线程
+    for (int i = 0; i < num_threads; ++i) {
+        threads.emplace_back(increment, num_iterations);
+    }
+
+    // 等待所有线程完成
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // 输出最终计数值
+    std::cout << "Final counter value: " << counter.load() << std::endl;
+
+    return 0;
+}
+
+```
+
+## 参考代码输出结果
+
+```cpp
+Final counter value: 10000
+```
+
+## 代码解析
+### 1. 原子变量定义
+
+```cpp
+std::atomic<int> counter(0);
+```
+定义一个初始值为 0 的原子整型变量。
+
+### 2. 原子操作
+
+```cpp
+counter.fetch_add(1, std::memory_order_relaxed);
+```
+
+使用 fetch_add 原子递增，第二个参数指定内存顺序（这里使用 memory_order_relaxed 表示不对内存顺序进行额外约束）。
+
+### 3. 多线程安全 
+每个线程对 counter 的递增操作是原子的，确保不会出现数据竞争。
+
+### 4. 结果验证 
+主线程等待所有子线程完成后，打印 counter 的最终值，应为 num_threads * num_iterations。
+
+## 输出示例
+假设 num_threads = 10，num_iterations = 1000，则程序输出为：
+
+```cpp
+Final counter value: 10000
+```
+
+这种方式比使用锁更高效，且避免了死锁等问题，是多线程编程中的重要工具。
