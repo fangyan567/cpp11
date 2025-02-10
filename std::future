@@ -1,0 +1,135 @@
+# C++ std::future
+## std::future的定义和功能作用
+### 定义：
+std::future 是 C++11 引入的标准库中的一种模板类，用于实现线程间的异步操作结果的获取。它是标准库 <future> 中的一部分，配合 std::async、std::promise 等工具使用。
+
+### 功能作用：
+异步结果获取：可以用来获取异步操作的返回值或结果。
+同步操作：通过阻塞调用线程直到异步任务完成（如调用 get()），保证线程间的同步。
+异常传递：异步任务的异常可以通过 std::future 传递到调用线程，并在调用 get() 时抛出。
+状态查询：可以检查任务的完成状态。
+## 相关接口：
+get()：获取异步操作的结果，并阻塞线程直到结果准备好。
+valid()：检查 std::future 是否关联了共享状态。
+wait()：阻塞直到共享状态就绪。
+wait_for 和 wait_until：带超时功能的等待。
+## std::future参考代码示例：
+以下代码展示了如何使用 std::future 和 std::async 来实现异步计算。
+
+```cpp
+#include <iostream>
+#include <future>
+#include <thread>
+#include <chrono>
+
+// 一个耗时的计算函数
+int heavy_computation(int x) {
+    std::cout << "Heavy computation starts in thread: " 
+              << std::this_thread::get_id() << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(3)); // 模拟耗时操作
+    return x * x;
+}
+
+int main() {
+    std::cout << "Main thread ID: " << std::this_thread::get_id() << std::endl;
+
+    // 使用 std::async 创建异步任务
+    std::future<int> result = std::async(std::launch::async, heavy_computation, 10);
+
+    // 主线程可以执行其他任务
+    std::cout << "Main thread is working...\n";
+
+    // 等待异步任务完成并获取结果
+    int value = result.get();
+    std::cout << "Result from async task: " << value << std::endl;
+
+    return 0;
+}
+
+```
+
+## std::future参考代码输出结果
+
+```cpp
+Main thread ID: 139945441609536
+Heavy computation starts in thread: 139945441607424
+Main thread is working...
+Result from async task: 100
+
+```
+
+## 参考代码解释：
+std::async 会在后台启动一个线程来执行 heavy_computation。
+result.get() 阻塞主线程，直到计算完成并返回结果。
+主线程在等待异步任务完成之前可以执行其他操作。
+
+## 注意：
+如果在 std::async 中未指定 std::launch::async 或 std::launch::deferred，实现可以选择异步或延迟执行。
+如果多次调用 get() 或调用后调用 valid()，会报错，因为共享状态只能被访问一次。
+
+
+## future相关的类
+C++11关于异步操作提供了future相关的类，主要有std::future、std::promise和std::packaged_task，std::future比std::thread高级些，std::future作为异步结果的传输通道，通过get()可以很方便的获取线程函数的返回值，std::promise用来包装一个值，将数据和future绑定起来，而std::packaged_task则用来包装一个调用对象，将函数和future绑定起来，方便异步调用。而std::future是不可以复制的，如果需要复制放到容器中可以使用std::shared_future。
+## std::future参考代码二
+
+```cpp
+#include <functional>
+#include <future>
+#include <iostream>
+#include <thread>
+
+using namespace std;
+
+void func(std::future<int>& fut) {
+    int x = fut.get();
+    cout << "value: " << x << endl;
+}
+
+int main() {
+    std::promise<int> pm;
+    std::future<int> res = pm.get_future();
+    std::thread t(func, std::ref(res));
+    pm.set_value(100);
+    t.join();
+    return 0;
+}
+```
+
+## std::future参考代码二输出结果
+
+```cpp
+value: 100
+```
+
+
+## std::future参考代码三
+
+```cpp
+#include <functional>
+#include <future>
+#include <iostream>
+#include <thread>
+
+using namespace std;
+
+int func(int sum) {
+    return sum + 1;
+}
+
+int main() {
+    std::packaged_task<int(int)> task(func);
+    std::future<int> res = task.get_future();
+    std::thread(std::move(task), 10).detach();
+    cout << "result " << res.get() << endl;
+    return 0;
+}
+```
+
+## std::future参考代码三输出结果
+
+```cpp
+result 11
+```
+
+## 三者之间的关系
+std::future用于访问异步操作的结果，而std::promise和std::packaged_task在future高一层，它们内部都有一个future，promise包装的是一个值，packaged_task包装的是一个函数，当需要获取线程中的某个值，可以使用std::promise，当需要获取线程函数返回值，可以使用std::packaged_task。
