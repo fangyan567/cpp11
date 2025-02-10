@@ -1,0 +1,264 @@
+
+智能指针shared_ptr引用计数
+```cpp
+#include <iostream>
+#include <memory>
+#include <vector>
+#include <cstring>
+using namespace std;
+
+class City
+{
+public:
+   string name;
+   City(string m_name)
+   {
+       this->name = m_name;
+       cout << "name = " << name <<endl;
+       cout<<"调用构造函数~City("<<name<<")析构。\n";
+   }
+
+   ~City()
+   {
+       cout<<"调用析构函数~City("<<name<<")析构。\n";
+   }
+};
+
+int main()
+{
+    shared_ptr<City> p0(new City("shanghai"));
+    shared_ptr<City> p = p0;
+    shared_ptr<City> p1 = p0;
+    
+    shared_ptr<City> q0(new City("beijing"));
+    shared_ptr<City> q1 = q0;
+    shared_ptr<City> q2= q0;
+
+    cout << "p0.use_count() = " << p0.use_count()<< endl;
+    cout << "q2.use_count() = " << q2.use_count()<< endl;
+
+    return 0;
+}
+
+//输出:
+name = shanghai
+调用构造函数~City(shanghai)析构。
+name = beijing
+调用构造函数~City(beijing)析构。
+p0.use_count() = 3
+q2.use_count() = 3
+调用析构函数~City(beijing)析构。
+调用析构函数~City(shanghai)析构。
+```
+
+
+
+shaped_ptr支持普通的拷贝和赋值，左边的shaped_ptr引用计数+1，右边的shaped_ptr引用计数-1。当shaped_ptr的引用计数为0时，就会调用析构函数，释放资源。
+
+```cpp
+#include <iostream>
+#include <memory>
+using namespace std;
+
+class City
+{    
+public:
+   string name;
+   City(string m_name)
+   {
+    name = m_name;
+    cout <<"构造 City = "<< name << endl;
+   }
+   ~City()
+   {
+    cout << "析构 City = "<< name << endl;
+   }
+
+};
+
+int main() 
+{
+    shared_ptr<City> p0 (new City("nanjing"));
+    shared_ptr<City> p1 = p0;
+    shared_ptr<City> p2 = p1;
+
+    shared_ptr<City> q0 (new City("hangzhou"));
+    shared_ptr<City> q1 = q0;
+    shared_ptr<City> q2 = q1;
+    cout << "原始记录: " << endl;
+    cout <<"p0.use_count() = " << p0.use_count() << endl;
+    cout << "q0.use_count() = " << q0.use_count() << endl;
+
+    q1 = p0;
+    cout << "q1 = p0之后: " << endl;
+    cout <<"p0.use_count() = " << p0.use_count() << endl;
+    cout << "q0.use_count() = " << q0.use_count() << endl;
+    
+    q2 = p1;
+    cout << "q2 = p1之后: " << endl;
+    cout <<"p0.use_count() = " << p0.use_count() << endl;
+    cout << "q0.use_count() = " << q0.use_count() << endl;
+    
+    cout << "q0 = p2之前: " << endl;
+    q0 = p2;
+    cout << "q0 = p2之后: " << endl;
+    cout <<"p0.use_count() = " << p0.use_count() << endl;
+    cout << "q0.use_count() = " << q2.use_count() << endl;
+    
+    return 0;
+    
+//输出:
+构造 City = nanjing
+构造 City = hangzhou
+原始记录:
+p0.use_count() = 3
+q0.use_count() = 3
+q1 = p0之后:
+p0.use_count() = 4
+q0.use_count() = 2
+q2 = p1之后:
+p0.use_count() = 5
+q0.use_count() = 1
+q0 = p2之前:
+析构 City = hangzhou
+q0 = p2之后:
+p0.use_count() = 6
+q0.use_count() = 6
+析构 City = nanjing
+}
+```
+
+shaped_ptr相互引用，造成引用计数无法为0，会造成内存泄露，这时引入了weak_ptr，解决shaped_ptr相互引用计数，解决了内存泄露问题。
+
+
+shaped_ptr循环引用计数参考代码：
+
+```cpp
+#include <iostream>
+#include <memory>
+using namespace std;
+
+class A;
+class B;
+
+class A
+{
+public:
+    A()
+    {
+        cout << "A 构造函数" << endl;
+    }
+    ~A()
+    {
+        cout << "A 析构函数" << endl;
+    }
+    shared_ptr<B> ptr;
+};
+
+class B
+{
+public:
+    B()
+    {
+        cout << "B 构造函数" << endl;
+    }
+    ~B()
+    {
+        cout << "B 析构函数" << endl;
+    }
+    shared_ptr<A> ptr;
+};
+
+int main()
+{
+    shared_ptr<A> pa(new A());   //A对象的引用计数ref=1
+    shared_ptr<B> pb(new B());   //B对象的引用计数ref=1
+    pa->ptr = pb;    //B对象的引用计数ref=2
+    pb->ptr = pa;    //A对象的引用计数ref=2
+        
+    cout << "pa.use_count() = " << pa.use_count() <<endl;
+    cout << "pb.use_count() = "<< pb.use_count() << endl;
+     //离开作用域后，虽然pa和pb智能指针对象释放了，但由于其所指对象的引用计数为1而未被释放，故造成内存泄漏。
+    
+    return 0;
+     /*
+     *首先创建的时候双方的引用计数为1，接着pb赋值给pa->ptr_b这个会使pb的引用计数加1，
+     此时为2，pa仍为1，接着pa赋值给pb->ptr_a这个由于是weak_ptr指针的构造，
+     不会使它的引用计数加1，pa的引用计数为1，pb的引用计数为2，离开作用域后，pa计数为0，析构，pb计数为2-1=1，不析构，
+     但是由于pa析构，pa中的ptr_b会析构，那么引用计数减1，这时候pb引用计数为1-1=0，也析构。实现资源的完整释放。
+     */
+}
+//输出:
+A 构造函数
+B 构造函数
+pa.use_count() = 2
+pb.use_count() = 2
+```
+
+
+weak_ptr解决循环引用计数参考代码：
+
+```cpp
+#include <iostream>
+#include <memory>
+using namespace std;
+
+class A;
+class B;
+
+class A
+{
+public:
+    A()
+    {
+        cout << "A 构造函数" << endl;
+    }
+    ~A()
+    {
+        cout << "A 析构函数" << endl;
+    }
+    shared_ptr<B> ptr;
+};
+
+class B
+{
+public:
+    B()
+    {
+        cout << "B 构造函数" << endl;
+    }
+    ~B()
+    {
+        cout << "B 析构函数" << endl;
+    }
+    weak_ptr<A> ptr;
+};
+
+int main()
+{
+    shared_ptr<A> pa(new A());   //A对象的引用计数ref=1
+    shared_ptr<B> pb(new B());   //B对象的引用计数ref=1
+    pa->ptr = pb;    //B对象的引用计数ref=2
+    pb->ptr = pa;    //A对象的引用计数ref=2
+        
+    cout << "pa.use_count() = " << pa.use_count() <<endl;
+    cout << "pb.use_count() = "<< pb.use_count() << endl;
+     //离开作用域后，虽然pa和pb智能指针对象释放了，但由于其所指对象的引用计数为1而未被释放，故造成内存泄漏。
+    
+    return 0;
+     /*
+     *首先创建的时候双方的引用计数为1，接着pb赋值给pa->ptr_b这个会使pb的引用计数加1，
+     此时为2，pa仍为1，接着pa赋值给pb->ptr_a这个由于是weak_ptr指针的构造，
+     不会使它的引用计数加1，pa的引用计数为1，pb的引用计数为2，离开作用域后，pa计数为0，析构，pb计数为2-1=1，不析构，
+     但是由于pa析构，pa中的ptr_b会析构，那么引用计数减1，这时候pb引用计数为1-1=0，也析构。实现资源的完整释放。
+     */
+}
+
+//输出:
+A 构造函数
+B 构造函数
+pa.use_count() = 1
+pb.use_count() = 2
+A 析构函数
+B 析构函数
+```
