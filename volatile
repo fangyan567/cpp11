@@ -1,0 +1,80 @@
+# C++ volatile
+在C++中，volatile 是一个类型限定符，用于告诉编译器某个变量的值可能在程序之外被改变。因此，编译器在对该变量进行优化时，必须小心避免去掉或修改对该变量的读取或写入操作。
+
+## 定义与作用
+### 定义:
+volatile关键字用于声明一个变量可能被外部事件（如硬件中断、另一个线程等）修改。
+通常用于嵌入式编程和多线程编程中。
+### 功能与作用:
+防止编译器对该变量进行优化。
+确保每次访问时，编译器都从内存中读取变量的最新值，而不是使用寄存器中缓存的值。
+## volatile示例代码
+以下是一个完整的代码示例，展示了volatile的使用：
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <atomic>
+
+// 示例1: 使用volatile与普通变量对比
+volatile bool stop_flag = false;  // 声明为volatile变量
+
+void workerThread() {
+    int counter = 0;
+    while (!stop_flag) {  // volatile确保每次从内存读取stop_flag
+        counter++;
+    }
+    std::cout << "Worker thread stopped after " << counter << " iterations." << std::endl;
+}
+
+// 示例2: 使用std::atomic代替volatile (推荐用法)
+std::atomic<bool> atomic_flag(false);
+
+void atomicWorkerThread() {
+    int counter = 0;
+    while (!atomic_flag.load()) {  // 原子操作确保线程安全
+        counter++;
+    }
+    std::cout << "Atomic worker thread stopped after " << counter << " iterations." << std::endl;
+}
+
+int main() {
+    // 使用volatile的线程示例
+    std::thread t1(workerThread);
+    std::this_thread::sleep_for(std::chrono::seconds(1));  // 主线程暂停1秒
+    stop_flag = true;  // 修改volatile变量，通知线程停止
+    t1.join();
+
+    // 使用std::atomic的线程示例
+    std::thread t2(atomicWorkerThread);
+    std::this_thread::sleep_for(std::chrono::seconds(1));  // 主线程暂停1秒
+    atomic_flag.store(true);  // 修改atomic变量，通知线程停止
+    t2.join();
+
+    return 0;
+}
+
+```
+
+## volatile输出结果
+
+```cpp
+Worker thread stopped after 645202174 iterations.
+Atomic worker thread stopped after 218850736 iterations.
+```
+
+```cpp
+Worker thread stopped after 713982677 iterations.
+Atomic worker thread stopped after 211369915 iterations.
+```
+
+**备注**：两次输出结果不一样。
+
+## 代码说明
+### volatile的作用:
+
+1. 在workerThread中，stop_flag被声明为volatile，这保证了线程会读取stop_flag的最新值，而不会被编译器优化成读取缓存值。
+2. 如果没有volatile修饰，编译器可能会优化掉循环中的stop_flag读取，导致线程无法正确停止。
+### 推荐用法:
+
+在多线程编程中，std::atomic更推荐使用，因为它不仅防止优化，还提供线程安全性，避免数据竞争。
