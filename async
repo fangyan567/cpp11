@@ -1,0 +1,384 @@
+# async
+在C++中，async 是标准库中的一种异步操作工具，用于启动异步任务。它是C++11引入的一部分，位于头文件 <future> 中。std::async 提供了一种轻量级的方式来创建线程或异步任务并获取结果。
+
+## 定义
+std::async 是一个模板函数，定义如下：
+```cpp
+template< class Function, class... Args >
+std::future<typename std::result_of<Function(Args...)>::type>
+async( std::launch policy, Function&& f, Args&&... args );
+```
+
+**policy:** 指定如何启动任务，有以下选项：
+**std::launch::async:** 强制在新线程中异步执行。
+**std::launch::deferred:** 延迟执行，直到调用 get 或 wait。
+**std::launch::async | std::launch::deferred（默认）:** 由实现决定是否创建新线程或延迟执行。
+**f:** 要执行的函数。
+**args:** 函数的参数。
+## 功能与作用
+1. **任务并行**: 提高程序的运行效率。
+2. **简化多线程操作**: 管理线程及其结果的同步。
+3. **提供线程返回值**: 使用 std::future 获取异步任务的返回值。
+
+
+
+
+## async参考代码示例
+以下代码展示了 **std::async** 的基本用法：
+```cpp
+#include <iostream>
+#include <future>
+#include <thread>
+#include <chrono>
+
+// 一个耗时的任务
+int longTask(int duration, const std::string& taskName) {
+    std::cout << "Task " << taskName << " started in thread "
+              << std::this_thread::get_id() << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(duration));
+    std::cout << "Task " << taskName << " finished." << std::endl;
+    return duration * 2;
+}
+
+int main() {
+    // 启动异步任务，指定为 std::launch::async 强制使用新线程
+    auto future1 = std::async(std::launch::async, longTask, 3, "A");
+
+    // 启动延迟任务（deferred）
+    auto future2 = std::async(std::launch::deferred, longTask, 2, "B");
+
+    // 主线程的任务
+    std::cout << "Main thread is running in thread "
+              << std::this_thread::get_id() << std::endl;
+
+    // 获取结果
+    int result1 = future1.get(); // 立即启动并等待完成
+    std::cout << "Result of Task A: " << result1 << std::endl;
+
+    int result2 = future2.get(); // 延迟任务在这里执行
+    std::cout << "Result of Task B: " << result2 << std::endl;
+
+    return 0;
+}
+
+```
+
+
+## async参考代码输出结果
+
+```cpp
+Main thread is running in thread 140147801564992
+Task A started in thread 140147783354112
+Task A finished.
+Result of Task A: 9
+Task B started in thread 140147801564992
+Task B finished.
+Result of Task B: 4
+```
+
+
+## async参考代码解释
+1. **longTask**: 一个模拟耗时操作的函数。
+2. **std::async** 的两种策略:
+**std::launch::async**: 强制新线程执行任务。
+**std::launch::deferred**: 延迟任务，只有在调用 get() 或 wait() 时才执行。
+3. **std::future**:
+用于存储异步任务的返回值。
+调用 **future.get()** 等待任务完成并获取结果。
+
+## 注意事项
+1. 异步任务可能会带来竞态条件（**race conditions**），需要小心同步。
+2. 如果没有调用 **get** 或 **wait**，异步任务的结果可能未被访问，可能导致未定义行为或资源浪费。
+
+
+## async参考代码二
+
+```cpp
+#include <functional>
+#include <future>
+#include <iostream>
+#include <thread>
+
+using namespace std;
+
+int func(int num) { return num + 5; }
+
+int main() {
+    auto res = std::async(func, 10);
+    // res.wait();
+    cout << res.get() << endl; // 阻塞直到函数返回
+    return 0;
+}
+```
+
+
+## async参考代码二输出结果
+
+```cpp
+15
+```
+
+## async具体语法如下：
+
+```cpp
+async(std::launch::async | std::launch::deferred, func, args...);
+```
+
+第一个参数是创建策略：
+
+**std::launch::async**表示任务执行在另一线程
+**std::launch::deferred**表示延迟执行任务，调用get或者wait时才会执行，不会创建线程，惰性执行在当前线程。
+如果不明确指定创建策略，以上两个都不是async的默认策略，而是未定义，它是一个基于任务的程序设计，内部有一个调度器(线程池)，会根据实际情况决定采用哪种策略。
+
+若从 **std::async** 获得的 **std::future** 未被移动或绑定到引用，则在完整表达式结尾， **std::future**的析构函数将阻塞直至异步计算完成，实际上相当于同步操作：
+
+```cpp
+std::async(std::launch::async, []{ f(); }); // 临时量的析构函数等待 f()
+std::async(std::launch::async, []{ g(); }); // f() 完成前不开始
+```
+
+### 注意：
+关于**async**启动策略这里以**cppreference**为主。
+
+有时候如果想真正执行异步操作可以对async进行封装，强制使用**std::launch::async**策略来调用**async**。
+
+```cpp
+template <typename F, typename... Args>
+inline auto ReallyAsync(F&& f, Args&&... params) {
+    return std::async(std::launch::async, std::forward<F>(f), std::forward<Args>(params)...);
+}
+```
+
+# C++11 的异步操作-async
+C++11中增加了async，如它的名字一样，这个关键字就是用来创建异步操作的，c++11中有个更常用的异步操作，叫做线程thread，那么thread和async有什么区别呢？以及async的优势是什么？应该怎么使用？
+
+## C++11 使用 std::async创建异步程序
+C++11中增加了线程，可以非常方便的创建线程，它的基本用法是这样的：
+### std::thread
+```cpp
+void f(int n);
+std::thread t(f, n + 1);
+t.join();
+```
+
+但是线程毕竟是属于比较低层次的东西，有时候使用有些不便，比如希望获取线程函数的返回结果的时候，就不能直接通过 thread.join()得到结果，这时就必须定义一个变量，在线程函数中去给这个变量赋值，然后join，最后得到结果，这个过程是比较繁琐的。
+
+C++11还提供了异步接口std::async，通过这个异步接口可以很方便的获取线程函数的执行结果。std::async会自动创建一个线程去调用线程函数，它返回一个std::future，这个future中存储了线程函数返回的结果，当需要线程函数的结果时，直接从future中获取，非常方便。
+
+其实std::async提供的便利可不仅仅是这一点，它首先解耦了线程的创建和执行，可以在需要的时候获取异步操作的结果；其次它还提供了线程的创建策略（比如可以通过延迟加载的方式去创建线程），可以以多种方式去创建线程。在介绍async具体用法以及为什么要用std::async代替线程的创建之前，先看看std::future、std::promise和 std::packaged_task。
+
+### std::future
+**std::future**是一个非常有用也很有意思的东西，简单说**std::future**提供了一种访问异步操作结果的机制。从字面意思来理解， 它表示未来，因为一个异步操作是不可能马上就获取操作结果的，只能在未来某个时候获取，但是可以以同步等待的方式来获取结果，可以通过查询**future**的状态（**future_status**）来获取异步操作的结果。**future_status**有三种状态：
+
+**deferred**：异步操作还没开始
+
+**ready**：异步操作已经完成
+
+**timeout**：异步操作超时
+
+```cpp
+//查询future的状态
+std::future_status status;
+do {
+    status = future.wait_for(std::chrono::seconds(1));
+    if (status == std::future_status::deferred) {
+        std::cout << "deferred\n";
+    } else if (status == std::future_status::timeout) {
+        std::cout << "timeout\n";
+    } else if (status == std::future_status::ready) {
+        std::cout << "ready!\n";
+} while (status != std::future_status::ready);
+```
+
+获取future结果有三种方式：get、wait、wait_for，其中get等待异步操作结束并返回结果，wait只是等待异步操作完成，没有返回值，wait_for是超时等待返回结果。
+
+
+### std::promise
+**std::promise**为获取线程函数中的某个值提供便利，在线程函数中给外面传进来的**promise**赋值，当线程函数执行完成之后就可以通过**promis**获取该值了，值得注意的是取值是间接的通过promise内部提供的**future**来获取的。它的基本用法：
+
+```cpp
+std::promise<int> pr;
+std::thread t([](std::promise<int>& p){
+    p.set_value_at_thread_exit(9);
+},std::ref(pr));
+std::future<int> f = pr.get_future();
+auto r = f.get();
+```
+
+### std::packaged_task
+**std::packaged_task**它包装了一个可调用的目标（如function, lambda expression, bind expression, or another function object）,以便异步调用，它和**promise**在某种程度上有点像，promise保存了一个共享状态的值，而**packaged_task**保存的是一 个函数。它的基本用法：
+
+```cpp
+std::packaged_task<int()> task([](){ return 7; });
+std::thread t1(std::ref(task)); 
+std::future<int> f1 = task.get_future(); 
+auto r1 = f1.get();
+```
+
+
+### std::promise、std::packaged_task和std::future的关系
+看了std::async相关的几个对象std::future、std::promise和std::packaged_task，其中 std::promise和std::packaged_task的结果最终都是通过其内部的future返回出来的，看看他们之间的关系到底是怎样的，std::future提供了一个访问异步操作结果的机制，它和线程是一个级别的属于低层次的对象，在它之上高一层的是std::packaged_task和std::promise，他们内部都有future以便访问异步操作结果，std::packaged_task包装的是一个异步操作，而std::promise包装的是一个值，都是为了方便异步操作的，因为有时需要获取线程中的某个值，这时就用std::promise，而有时需要获一个异步操作的返回值，这时就用std::packaged_task。
+
+那 std::promise和std::packaged_task之间又是什么关系呢？说他们没关系也没关系，说他们有关系也有关系，都取决于如何使用他们了，可以将一个异步操作的结果保存到std::promise中。
+
+## async参考代码三
+
+```cpp
+#include <iostream>
+#include <future>
+#include <thread>
+#include <chrono>
+
+#ifdef _WIN32
+#include <windows.h> // Sleep for Windows
+#else
+#include <unistd.h>  // sleep for POSIX systems
+#endif
+
+int main() {
+    // 示例1: 异步任务返回值
+    std::future<int> f1 = std::async(std::launch::async, []() {
+        return 8; // 简单的异步任务，返回整数8
+    });
+    std::cout << "Result of f1: " << f1.get() << std::endl; // 输出: 8
+
+    // 示例2: 异步任务返回void
+    std::future<void> f2 = std::async(std::launch::async, []() {
+        std::cout << "Task f2 prints: 8" << std::endl;
+    });
+    f2.wait(); // 等待任务完成
+
+    // 示例3: 等待异步任务完成并检查状态
+    std::future<int> future = std::async(std::launch::async, []() {
+        std::this_thread::sleep_for(std::chrono::seconds(3)); // 模拟耗时操作
+        return 8;
+    });
+
+    std::cout << "waiting...\n";
+    std::future_status status;
+
+    // 主线程睡眠3秒
+#ifdef _WIN32
+    Sleep(3000); // Windows平台睡眠3秒
+#else
+    sleep(3);    // POSIX平台睡眠3秒
+#endif
+
+    do {
+        status = future.wait_for(std::chrono::seconds(1)); // 检查任务状态
+        if (status == std::future_status::deferred) {
+            std::cout << "Task is deferred\n";
+        } else if (status == std::future_status::timeout) {
+            std::cout << "Task timeout\n";
+        } else if (status == std::future_status::ready) {
+            std::cout << "Task is ready!\n";
+        }
+    } while (status != std::future_status::ready);
+
+    std::cout << "Result of future: " << future.get() << '\n'; // 获取任务结果
+    return 0;
+}
+```
+
+## 为什么要用std::async代替线程的创建
+**std::async**是为了让开发者的少费点脑子的，它让这三个对象默契的工作。
+大概的工作过程是这样的：**std::async**先将异步操作用**std::packaged_task**包 装起来，然后将异步操作的结果放到**std::promise**中，这个过程就是创造未来的过程。外面再通过**future.get/wait**来获取这个未来的结果！
+
+**现在来看看std::async的原型**
+
+```cpp
+async(std::launch::async | std::launch::deferred, f, args...) 
+```
+
+第一个参数是线程的创建策略，有两种策略，默认的策略是立即创建线程：
+
+**std::launch::async**：在调用async就开始创建线程。
+
+**std::launch::deferred**：延迟加载方式创建线程。调用async时不创建线程，直到调用了future的get或者wait时才创建线程。
+
+第二个参数是线程函数，第三个参数是线程函数的参数。
+
+
+### std::async基本用法
+
+```cpp
+std::future<int> f1 = std::async(std::launch::async, []() {
+    return 8;
+    });
+cout << f1.get() << endl; //output: 8
+std::future<void> f2 = std::async(std::launch::async, []() {
+    cout << 8 << endl;
+    //return 8;
+    });
+f2.wait(); //output: 8
+std::future<int> future = std::async(std::launch::async, []() {
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    return 8;
+    });
+std::cout << "waiting...\n";
+//Test12();
+std::future_status status;
+Sleep(3000);
+do {
+    status = future.wait_for(std::chrono::seconds(1));
+    if (status == std::future_status::deferred) {
+        std::cout << "deferred\n";
+    }
+    else if (status == std::future_status::timeout) {
+        std::cout << "timeout\n";
+    }
+    else if (status == std::future_status::ready) {
+        std::cout << "ready!\n";
+    }
+} while (status != std::future_status::ready);
+std::cout << "result is " << future.get() << '\n';
+```
+
+## async参考代码三输出结果
+
+```cpp
+Result of f1: 8
+Task f2 prints: 8
+waiting...
+Task is ready!
+Result of future: 8
+```
+
+
+## async参考代码三解析
+### 示例1:
+使用 **std::future<int>** 接收异步任务的返回值。
+调用 **f1.get()** 获取返回值，输出 8。
+
+### 示例2:
+使用 **std::future<void>** 接收返回类型为 **void** 的任务。
+异步任务中打印数字 8。
+
+### 示例3:
+模拟一个耗时任务，主线程通过 **std::future_status** 检查任务状态。
+**future.wait_for(std::chrono::seconds(1))：**
+**std::future_status::deferred:** 任务被延迟。
+**std::future_status::timeout:** 任务超时。
+**std::future_status::ready:** 任务完成。
+循环等待任务完成，最后通过 future.get() 获取返回值。
+
+
+### 注意事项
+1. Sleep 是平台相关函数：
+Windows: 使用 <windows.h> 的 Sleep(milliseconds)。
+POSIX: 使用 <unistd.h> 的 sleep(seconds)。
+2. 如果异步任务未完成，future.get() 会阻塞直到任务完成。
+
+## std::async总结
+**std::async**是更高层次上的异步操作，它的存在可以使开发者不用关注线程创建内部细节，就能方便的获取异步执行状态和结果，还可以指定线程创建策略，应该用std::async替代线程的创建，让它成为做异步操作的首选。
+
+## C++11新特性之线程总结
+1.  **std::thread**使线程的创建变得非常简单，还可以获取线程id等信息。 
+2.  **std::mutex**通过多种方式保证了线程安全，互斥量可以独占，也可以重入，还可以设置互斥量的超时时间，避免一直阻塞等锁。 
+3. **std::lock**通过**RAII**技术方便了加锁和解锁调用，有**std::lock_guard**和**std::unique_lock**。 
+4. **std::atomic**提供了原子变量，更方便实现实现保护，不需要使用互斥量
+5. **std::call_once**保证函数在多线程环境下只调用一次，可用于实现单例。 
+6. **volatile**常用于读写操作不可以被优化掉的内存中
+7. **std::condition_variable**提供等待的同步机制，可阻塞一个或多个线程，等待其它线程通知后唤醒。 
+8.  **std::future**用于异步调用的包装和返回值。 
+9. **async**更方便的实现了异步调用，异步调用优先使用**async**取代创建线程。
