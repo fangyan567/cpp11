@@ -1,0 +1,139 @@
+# std::lock
+
+std::lock 是 C++ 标准库中的一个工具函数，用于同时锁定多个锁对象（通常是 std::mutex 或 std::unique_lock），以避免死锁问题。
+
+## 定义和功能
+### 定义
+std::lock 位于头文件 <mutex> 中，定义如下：
+
+```cpp
+namespace std {
+    template <class Lock1, class Lock2, class... Locks>
+    void lock(Lock1& lock1, Lock2& lock2, Locks&... locks);
+}
+
+```
+
+### 功能
+1. 它采用了一种算法（如 层次锁排序算法），确保在锁定多个互斥量时不会发生死锁。
+2. 该函数会尝试锁定提供的所有锁对象（以 不可中断的方式），直到全部成功。
+3. 支持任意数量的锁，至少需要两个。
+
+## std::lock参考代码
+以下是一个完整的代码示例，展示如何使用 std::lock 来同时锁定两个互斥量：
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+
+// 全局互斥量
+std::mutex mutex1;
+std::mutex mutex2;
+
+// 示例函数，模拟线程竞争资源
+void threadFunction1() {
+    // 使用 std::lock_guard 和 std::lock 保护临界区
+    std::lock(mutex1, mutex2);
+    std::lock_guard<std::mutex> lock1(mutex1, std::adopt_lock); // 自动接管锁
+    std::lock_guard<std::mutex> lock2(mutex2, std::adopt_lock);
+
+    std::cout << "Thread 1 has locked both mutexes" << std::endl;
+    // 模拟工作
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::cout << "Thread 1 is releasing the locks" << std::endl;
+}
+
+void threadFunction2() {
+    // 使用 std::lock_guard 和 std::lock 保护临界区
+    std::lock(mutex1, mutex2);
+    std::lock_guard<std::mutex> lock1(mutex1, std::adopt_lock); // 自动接管锁
+    std::lock_guard<std::mutex> lock2(mutex2, std::adopt_lock);
+
+    std::cout << "Thread 2 has locked both mutexes" << std::endl;
+    // 模拟工作
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::cout << "Thread 2 is releasing the locks" << std::endl;
+}
+
+int main() {
+    // 创建两个线程
+    std::thread t1(threadFunction1);
+    std::thread t2(threadFunction2);
+
+    // 等待线程完成
+    t1.join();
+    t2.join();
+
+    return 0;
+}
+
+```
+## std::lock参考代码输出结果
+运行结果（顺序可能会变化）：
+```cpp
+Thread 1 has locked both mutexes
+Thread 1 is releasing the locks
+Thread 2 has locked both mutexes
+Thread 2 is releasing the locks
+
+```
+
+
+## std::lock 代码解释
+
+**1. std::lock：**
+它会尝试锁定 mutex1 和 mutex2，确保两个锁的顺序一致，防止死锁。
+**2. std::lock_guard：**
+使用 std::adopt_lock 标志，表示接管已经被 std::lock 锁定的互斥量。
+自动释放锁，避免忘记解锁。
+**3. 线程同步：**
+由于 std::lock 的存在，两个线程可以安全地访问共享资源，而不会发生死锁。
+
+## std::lock_guard
+这里主要介绍两种RAII方式的锁封装，可以动态的释放锁资源，防止线程由于编码失误导致一直持有锁。
+
+C++11主要有std::lock_guard和std::unique_lock两种方式，使用方式都类似，如下：
+## std::lock 参考代码二
+
+```cpp
+#include <iostream>
+#include <mutex>
+#include <thread>
+#include <chrono>
+
+using namespace std;
+std::mutex mtx;
+
+int main() {
+    auto func = [](int k) {
+        // std::lock_guard<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> lock(mtx);
+        for (int i = 0; i < k; ++i) {
+            cout << i << " ";
+        }
+        cout << endl;
+    };
+    std::thread threads[6];
+    for (int i = 0; i < 6; ++i) {
+        threads[i] = std::thread(func, 6);
+    }
+    for (auto& t : threads) {
+        t.join();
+    }
+    return 0;
+}
+```
+## std::lock 参考代码二输出结果
+
+```cpp
+0 1 2 3 4 5 
+0 1 2 3 4 5 
+0 1 2 3 4 5 
+0 1 2 3 4 5 
+0 1 2 3 4 5 
+0 1 2 3 4 5
+```
+
+
+std::lock_gurad相比于std::unique_lock更加轻量级，少了一些成员函数，std::unique_lock类有unlock函数，可以手动释放锁，所以条件变量都配合std::unique_lock使用，而不是std::lock_guard，因为条件变量在wait时需要有手动释放锁的能力。
