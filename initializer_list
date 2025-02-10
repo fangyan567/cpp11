@@ -1,0 +1,118 @@
+# 列表初始化(initializer_list)
+列表初始化是C++中的一种语法特性，引入于C++11，用于更简单直观地初始化变量、对象或容器。它使用花括号 {}，提供了更安全的初始化方式，避免了类型窄化转换等潜在错误。
+
+## 定义
+列表初始化是用花括号 {} 提供初始值来初始化变量或对象。根据上下文，它支持以下几种用途：
+
+1. 初始化简单变量
+2. 初始化结构体或类
+3. 初始化标准容器（如std::vector、std::array等）
+4. 统一初始化方式，取代传统的构造函数或等号赋值。
+
+
+## 功能作用
+**1. 更简洁的初始化语法**
+使用花括号直接提供初始值。
+
+**2. 防止窄化转换**
+比如尝试将浮点数赋值给整数时，编译器会报错。
+
+**3. 适用于自动推导类型**
+结合auto或模板代码更高效。
+
+**4. 统一语法**
+替代不同的构造函数初始化方法，提供一致的代码风格。
+
+
+## 列表初始化参考代码
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <array>
+#include <string>
+
+// 自定义结构体
+struct Point {
+    int x;
+    int y;
+};
+
+// 自定义类
+class Rectangle {
+    int width, height;
+public:
+    // 构造函数
+    Rectangle(int w, int h) : width(w), height(h) {}
+
+    void print() const {
+        std::cout << "Rectangle(width: " << width << ", height: " << height << ")\n";
+    }
+};
+
+int main() {
+    // 1. 简单变量的列表初始化
+    int a{10};           // 等价于 int a = 10;
+    double b{3.14};      // 初始化浮点数
+    // int c{3.14};      // 编译错误，防止窄化转换
+    std::cout << "a = " << a << ", b = " << b << '\n';
+
+    // 2. 数组或std::array初始化
+    int arr[] = {1, 2, 3, 4, 5};
+    std::array<int, 3> stdArr = {10, 20, 30};
+    std::cout << "Array: ";
+    for (int i : arr) std::cout << i << " ";
+    std::cout << "\nstd::array: ";
+    for (int i : stdArr) std::cout << i << " ";
+    std::cout << '\n';
+
+    // 3. 初始化自定义结构体
+    Point p1{1, 2};
+    std::cout << "Point(x: " << p1.x << ", y: " << p1.y << ")\n";
+
+    // 4. 初始化自定义类
+    Rectangle rect{5, 10};
+    rect.print();
+
+    // 5. 使用标准容器
+    std::vector<int> vec{10, 20, 30, 40};
+    std::cout << "Vector: ";
+    for (int v : vec) std::cout << v << " ";
+    std::cout << '\n';
+
+    // 6. 使用auto推导类型
+    auto x = {1, 2, 3};  // 推导为std::initializer_list<int>
+    std::cout << "Auto list: ";
+    for (int v : x) std::cout << v << " ";
+    std::cout << '\n';
+
+    return 0;
+}
+
+```
+
+## 列表初始化参考代码输出结果
+
+```cpp
+a = 10, b = 3.14
+Array: 1 2 3 4 5 
+std::array: 10 20 30 
+Point(x: 1, y: 2)
+Rectangle(width: 5, height: 10)
+Vector: 10 20 30 40 
+Auto list: 1 2 3 
+```
+
+
+
+## 注意事项
+**1. 防止窄化转换**
+使用列表初始化时，编译器会阻止可能导致精度丢失的类型转换。
+
+**2. 初始化优先级**
+如果类提供了构造函数，与列表初始化冲突时可能导致编译错误，需要明确类的构造函数声明。
+
+**3. 与std::initializer_list的关系**
+如果类提供了std::initializer_list构造函数，则列表初始化会优先调用该构造函数。
+
+通过列表初始化，可以编写更安全、简洁且更具可读性的代码。
