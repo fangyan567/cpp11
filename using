@@ -1,0 +1,145 @@
+# 类型别名 (using)
+在C++中，using 关键字用于简化代码、减少冗余，提高代码可读性。它主要用于以下三种情况：
+
+
+1. 使用声明（Using Declarations）：允许你在当前作用域中使用其他作用域中的名字。例如：
+
+```cpp
+using namespace std; // 使得 std::cout 等于 cout
+
+```
+
+2. 别名声明（Using Aliases）：允许你为类型、函数、或变量定义一个别名，从而简化代码。例如：
+
+```cpp
+using MyInt = int;
+MyInt myVar = 10; // 等于 int myVar = 10;
+
+```
+
+3. 域限定符（Namespace）：简化代码中的名字冲突问题。通过 using 可以直接使用一个命名空间中的成员。例如：
+
+```cpp
+namespace ns {
+    int value = 5;
+}
+
+using namespace ns;
+cout << value; // 等于 std::cout << ns::value;
+
+```
+
+## using 参考代码
+
+以下是一些C++代码示例，展示了using关键字的不同用法：
+
+### 使用声明：
+
+```cpp
+#include <iostream>
+
+using namespace std;
+
+int main() {
+    cout << "Hello, world!" << endl;
+    return 0;
+}
+
+```
+
+### 使用声明输出结果
+
+```cpp
+Hello, world!
+```
+
+### 别名声明：
+
+```cpp
+#include <iostream>
+
+using MyInt = int;
+
+int main() {
+    MyInt myVar = 10;
+    std::cout << "My variable is: " << myVar << std::endl;
+    return 0;
+}
+
+```
+
+### 别名声明输出结果
+
+```cpp
+My variable is: 10
+```
+
+
+### 域限定符：
+
+```cpp
+#include <iostream>
+
+namespace ns {
+    int value = 5;
+}
+
+using namespace ns;
+
+int main() {
+    // 使用 value 变量，直接访问它而不需要 ns:: 前缀
+    std::cout << value << std::endl; // 输出: 5
+    return 0;
+}
+
+```
+
+### 域限定符输出结果
+
+```cpp
+Value is: 5
+```
+
+
+在C++中，namespace用于创建作用域，使得变量、函数、类型等在不同的代码区域不发生命名冲突。在这个例子中，namespace ns声明了一个名为ns的命名空间，其中包含了一个变量 value。这个变量 value 被初始化为 5。
+
+## 详细解释
+1. 定义命名空间：
+
+```cpp
+namespace ns {
+    int value = 5;
+}
+
+```
+
+这个代码段定义了一个名为 ns 的命名空间，并在其中声明了一个整型变量 value。该变量的初始值为 5。这种方式的好处是，当你需要将一些特定功能或变量放入独立作用域中时，可以避免与其他部分的代码发生命名冲突。
+
+2. using namespace ns;：
+
+```cpp
+using namespace ns;
+
+```
+通过使用 using namespace ns;，你告诉编译器在当前作用域中将 ns 命名空间的所有成员直接可用。这意味着，你可以在代码中直接使用 value 而不需要前缀 ns::。相当于声明了以下的代码：
+
+```cpp
+using ns::value;
+```
+
+3. 使用 value 变量：
+
+```cpp
+cout << value;
+
+```
+
+由于 value 是从 ns 命名空间中引入的，因此这行代码的等效写法是：
+
+```cpp
+cout << ns::value;
+
+```
+通过使用 using namespace ns;，你省略了 ns::，直接使用 value。
+
+在上述代码中，value 从 ns 命名空间中引入，并可以直接在当前作用域中使用。这样简化了代码，提高了可读性。如果你不使用 using namespace ns;，你必须在每次访问 value 时加上 ns:: 前缀，例如：std::cout << ns::value;。
