@@ -1,0 +1,125 @@
+## C++11右值引用
+
+下面是一个关于 C++11 右值引用（Rvalue References）的完整示例代码，涵盖了右值引用的基本概念、std::move、以及如何使用右值引用实现移动语义
+
+C++11右值引用参考代码
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+class MyClass {
+public:
+    int* data;
+    
+    // 默认构造函数
+    MyClass() : data(new int[100]) {
+        std::cout << "Default Constructor\n";
+    }
+    
+    // 带参数的构造函数
+    MyClass(int val) : data(new int[100]) {
+        std::cout << "Parameterized Constructor\n";
+        data[0] = val;
+    }
+    
+    // 移动构造函数 (右值引用)
+    MyClass(MyClass&& other) noexcept : data(other.data) {
+        std::cout << "Move Constructor\n";
+        other.data = nullptr;  // 防止原对象的内存被析构
+    }
+    
+    // 移动赋值运算符 (右值引用)
+    MyClass& operator=(MyClass&& other) noexcept {
+        std::cout << "Move Assignment Operator\n";
+        if (this != &other) {
+            delete[] data;        // 释放当前对象的数据
+            data = other.data;    // 转移资源
+            other.data = nullptr; // 置空源对象
+        }
+        return *this;
+    }
+    
+    // 拷贝构造函数
+    MyClass(const MyClass& other) : data(new int[100]) {
+        std::cout << "Copy Constructor\n";
+        std::copy(other.data, other.data + 100, data);
+    }
+    
+    // 析构函数
+    ~MyClass() {
+        delete[] data;
+        std::cout << "Destructor\n";
+    }
+    
+    // 打印数据
+    void print() const {
+        if (data) {
+            std::cout << "Data: " << data[0] << "\n";
+        } else {
+            std::cout << "Data is nullptr\n";
+        }
+    }
+};
+
+int main() {
+    MyClass obj1(42);            // 调用参数化构造函数
+    MyClass obj2 = std::move(obj1); // 调用移动构造函数
+
+    obj2.print(); // 输出: Data: 42
+    obj1.print(); // 输出: Data is nullptr
+
+    MyClass obj3;
+    obj3 = std::move(obj2);      // 调用移动赋值运算符
+
+    obj3.print(); // 输出: Data: 42
+    obj2.print(); // 输出: Data is nullptr
+
+    // 使用vector示范移动语义
+    std::vector<MyClass> vec;
+    vec.push_back(MyClass(100));  // Move发生在这里
+    
+    return 0;
+}
+
+```
+
+C++11右值引用输出结果
+
+```cpp
+Parameterized Constructor
+Move Constructor
+Data: 42
+Data is nullptr
+Default Constructor
+Move Assignment Operator
+Data: 42
+Data is nullptr
+Parameterized Constructor
+Move Constructor
+Destructor
+Destructor
+Destructor
+Destructor
+Destructor
+```
+
+
+## 代码解析：
+
+构造函数：
+
+默认构造函数：分配内存并初始化。
+带参数构造函数：给对象赋初值。
+拷贝构造函数：进行深拷贝操作。
+移动构造函数：将资源（内存、数据）从临时对象转移到新对象中，并将临时对象的数据指针置空。
+移动赋值运算符：
+
+使用 std::move 将一个右值对象的资源转移到当前对象，并释放当前对象的资源。
+析构函数：
+
+释放动态分配的内存。
+std::move：
+
+std::move 并不真正移动对象，它只是将左值转化为右值引用，从而启用移动语义
