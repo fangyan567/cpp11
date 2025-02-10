@@ -1,0 +1,111 @@
+# C++ 强制类型
+
+在 C++ 中，强制类型转换（也称为隐式转换或显式转换）允许将一个数据类型转换为另一个数据类型。强制类型转换可以是隐式的（自动转换）或显式的（通过显式类型转换操作符 static_cast, reinterpret_cast, const_cast, dynamic_cast 等来进行）。
+
+## 强制类型转换的定义
+强制类型转换用于转换不同数据类型之间的数据，例如从整型到浮点型，或者从基类指针到派生类指针等。
+
+## 关键的强制类型转换操作符
+1. **static_cast**: 用于编译器安全的转换。通常用于整数到浮点数的转换。
+2. **reinterpret_cast**: 用于无类型检查的强制转换。例如，从一个类指针转换到另一个类指针。
+3. **const_cast**: 用于去除或添加常量属性。
+4. **dynamic_cast**: 用于在多态对象之间的安全转换。
+
+## 参考代码
+
+```cpp
+#include <iostream>
+
+// 定义基类 Base
+class Base {
+public:
+    int x;  // 公共成员变量
+    Base(int xVal) : x(xVal) {}  // 构造函数初始化 x
+    virtual ~Base() {}  // 虚析构函数，确保正确析构派生类对象
+};
+
+// 定义派生类 Derived
+class Derived : public Base {
+public:
+    int y;  // 派生类新增的成员变量
+    Derived(int xVal, int yVal) : Base(xVal), y(yVal) {}  // 构造函数初始化 x 和 y
+};
+
+int main() {
+    // 动态分配 Derived 对象，并用基类指针指向它
+    Base* basePtr = new Derived(10, 20);
+
+    // 使用 reinterpret_cast 将基类指针转换为派生类指针
+    Derived* derivedPtr = reinterpret_cast<Derived*>(basePtr);
+
+    // 输出派生类成员的值
+    std::cout << "基类成员 x = " << derivedPtr->x << std::endl;
+    std::cout << "派生类成员 y = " << derivedPtr->y << std::endl;
+
+    // 释放内存
+    delete basePtr;
+    return 0;
+}
+
+```
+
+## 代码输出
+
+```cpp
+基类成员 x = 10
+派生类成员 y = 20
+```
+
+## 代码说明：
+
+### 类的声明：
+1. 使用 class 替代 struct，并将成员变量定义为 public，便于直接访问。
+2. 基类 Base 包含一个构造函数用于初始化成员 x。
+3. 派生类 Derived 包含一个构造函数，用于初始化基类成员和派生类新增成员 y。
+### 构造函数：
+为 Base 和 Derived 添加了构造函数，支持通过参数进行初始化。
+Base 初始化 x，Derived 调用基类的构造函数，同时初始化自己的成员 y。
+### 动态分配：
+使用 new Derived(10, 20) 分配内存，并用基类指针 basePtr 指向该对象。
+### 指针转换：
+使用 reinterpret_cast 将 basePtr 强制转换为 Derived* 类型，方便访问派生类的成员。
+### 虚析构函数：
+基类中定义了虚析构函数 ~Base()，以确保通过基类指针删除派生类对象时，派生类的析构函数能够正确调用。
+### 类型转换：
+使用 reinterpret_cast 将基类指针强制转换为派生类指针，方便访问派生类的成员。
+### 内存释放：
+使用 delete basePtr 释放动态分配的内存。
+
+## 参考代码二
+
+```cpp
+#include <iostream>
+
+// 定义结构体 Base 和派生结构体 Derived
+struct Base {
+    int x;
+    Base(int xVal) : x(xVal) {}  // 构造函数初始化 x
+};
+
+struct Derived : public Base {
+    int y;
+    Derived(int xVal, int yVal) : Base(xVal), y(yVal) {}  // 构造函数初始化 x 和 y
+};
+
+int main() {
+    // 动态分配 Derived 对象，并用基类指针指向它
+    Base* basePtr = new Derived(10, 20);
+
+    // 使用 reinterpret_cast 将基类指针转换为派生类指针
+    Derived* derivedPtr = reinterpret_cast<Derived*>(basePtr);
+
+    // 输出派生类成员的值
+    std::cout << "基类成员 x = " << derivedPtr->x << std::endl;
+    std::cout << "派生类成员 y = " << derivedPtr->y << std::endl;
+
+    // 释放内存
+    delete derivedPtr;
+    return 0;
+}
+
+```
