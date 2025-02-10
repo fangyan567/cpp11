@@ -1,0 +1,212 @@
+# C++ condition_variable
+## condition_variable 的定义和作用
+std::condition_variable 是 C++ 标准库中的同步机制，用于线程间的通信和协作，主要用来让一个线程等待某个条件发生（通常是由其他线程通知）。它是基于信号量的高级封装，配合互斥锁（std::mutex）和条件标志（通常是布尔值或其他标志变量）一起使用。
+
+### 功能与作用
+1. 等待条件满足：线程可以使用 std::condition_variable::wait 方法挂起，直到另一个线程通知它条件已经满足。
+2. 通知等待的线程：可以通过 notify_one 或 notify_all 方法唤醒一个或所有等待线程。
+3. 避免了轮询检查条件的低效方式。
+
+## condition_variable参考代码示例：生产者-消费者模型
+以下是一个完整的例子，展示了 std::condition_variable 的用法。
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
+#include <chrono>
+
+std::queue<int> dataQueue;         // 用于存储数据的队列
+std::mutex mtx;                    // 互斥锁，保护共享资源
+std::condition_variable cv;        // 条件变量，控制线程同步
+bool done = false;                 // 标志生产是否结束
+
+// 生产者函数
+void producer(int count) {
+    for (int i = 0; i < count; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 模拟生产耗时
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            dataQueue.push(i);
+            std::cout << "Produced: " << i << std::endl;
+        }
+        cv.notify_one(); // 通知消费者
+    }
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        done = true; // 设置生产结束标志
+    }
+    cv.notify_all(); // 通知所有等待线程
+}
+
+// 消费者函数
+void consumer() {
+    while (true) {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [] { return !dataQueue.empty() || done; }); // 等待条件
+        while (!dataQueue.empty()) {
+            int value = dataQueue.front();
+            dataQueue.pop();
+            std::cout << "Consumed: " << value << std::endl;
+        }
+        if (done && dataQueue.empty()) {
+            break; // 生产结束且队列为空，退出循环
+        }
+    }
+}
+
+int main() {
+    std::thread producerThread(producer, 10); // 生产 10 个数据
+    std::thread consumerThread(consumer);    // 消费者线程
+
+    producerThread.join();
+    consumerThread.join();
+
+    std::cout << "All tasks completed." << std::endl;
+    return 0;
+}
+
+```
+
+## condition_variable参考代码输出结果
+
+```cpp
+Produced: 0
+Consumed: 0
+Produced: 1
+Consumed: 1
+Produced: 2
+Consumed: 2
+Produced: 3
+Consumed: 3
+Produced: 4
+Consumed: 4
+Produced: 5
+Consumed: 5
+Produced: 6
+Consumed: 6
+Produced: 7
+Consumed: 7
+Produced: 8
+Consumed: 8
+Produced: 9
+Consumed: 9
+All tasks completed.
+```
+
+
+## 代码说明
+### 1. 队列与互斥锁：
+
+std::queue<int> 作为共享数据容器。
+std::mutex 保证多线程访问共享资源时的同步。
+### 2. 条件变量：
+
+cv.wait(lock, predicate)：等待条件成立，避免忙等。
+cv.notify_one() 和 cv.notify_all() 用于通知等待线程。
+### 3. 线程管理：
+
+std::thread 创建生产者和消费者线程。
+join() 确保主线程等待子线程结束。
+
+
+
+## condition_variable参考代码二
+条件变量是c++11引入的一种同步机制，它可以阻塞一个线程或者个线程，直到有线程通知或者超时才会唤醒正在阻塞的线程，条件变量需要和锁配合使用，这里的锁就是std::unique_lock。
+
+这里使用条件变量实现一个CountDownLatch：
+
+
+```cpp
+#include <iostream>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <chrono>
+#include <cstdint>
+
+class CountDownLatch {
+public:
+    // Constructor to initialize the latch with a count
+    explicit CountDownLatch(uint32_t count) : count_(count) {}
+
+    // Decrements the count and notifies all waiting threads if the count reaches zero
+    void CountDown() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (count_ > 0) {
+            --count_;
+            if (count_ == 0) {
+                cv_.notify_all();
+            }
+        }
+    }
+
+    // Waits until the count reaches zero or the specified timeout (if provided) elapses
+    void Await(uint32_t time_ms = 0) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (time_ms > 0) {
+            cv_.wait_for(lock, std::chrono::milliseconds(time_ms), [this]() { return count_ == 0; });
+        } else {
+            cv_.wait(lock, [this]() { return count_ == 0; });
+        }
+    }
+
+    // Returns the current count (thread-safe)
+    uint32_t GetCount() const {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return count_;
+    }
+
+private:
+    mutable std::mutex mutex_; // Mutex to protect shared state
+    std::condition_variable cv_; // Condition variable for synchronization
+    uint32_t count_; // Counter representing the number of tasks to wait for
+};
+
+int main() {
+    const uint32_t initial_count = 3;
+    CountDownLatch latch(initial_count);
+
+    auto worker = [&latch](int id) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::cout << "Worker " << id << " finished task.\n";
+        latch.CountDown();
+    };
+
+    std::thread t1(worker, 1);
+    std::thread t2(worker, 2);
+    std::thread t3(worker, 3);
+
+    std::cout << "Main thread is waiting for workers to finish...\n";
+    latch.Await();
+    std::cout << "All workers have finished. Main thread proceeding.\n";
+
+    t1.join();
+    t2.join();
+    t3.join();
+
+    return 0;
+}
+```
+
+## condition_variable参考代码二输出结果一
+
+```cpp
+Main thread is waiting for workers to finish...
+Worker 1 finished task.
+Worker 3 finished task.
+Worker 2 finished task.
+All workers have finished. Main thread proceeding.
+```
+
+## condition_variable参考代码二输出结果二
+
+```cpp
+Main thread is waiting for workers to finish...
+Worker 2 finished task.
+Worker 1 finished task.
+Worker 3 finished task.
+All workers have finished. Main thread proceeding.
+```
