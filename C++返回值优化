@@ -1,0 +1,52 @@
+# C++ 返回值优化
+
+C++中的返回值优化（Return Value Optimization, RVO）是编译器为了提高代码运行效率而进行的一种优化技术。RVO允许编译器将临时对象的构造过程优化为直接返回该对象，而不是拷贝或移动。通过这种方式，可以减少对象的拷贝开销，从而提高程序性能。
+
+## 作用：
+**1. 减少拷贝开销：**
+当一个函数返回一个临时对象时，传统做法是先构造一个临时对象，然后拷贝或移动到返回值上。这种方式会涉及拷贝构造或移动构造函数，导致额外的性能开销。而RVO可以避免这个拷贝或移动过程。
+**2. 提高代码效率：**
+通过RVO，可以直接返回临时对象，而不需要拷贝或移动，这样可以减少内存分配和拷贝的时间开销，提高程序的整体性能。
+
+## 返回值优化参考代码
+
+```cpp
+#include <iostream>
+
+class MyClass {
+public:
+    MyClass(int value) : data(value) {
+        std::cout << "Constructor called with value: " << data << std::endl;
+    }
+
+    int getData() const {
+        return data;
+    }
+
+private:
+    int data;
+};
+
+// Function that returns a temporary object
+MyClass createObject(int value) {
+    return MyClass(value); // RVO will optimize this call
+}
+
+int main() {
+    MyClass obj = createObject(10);
+    std::cout << "Returned object data: " << obj.getData() << std::endl;
+    return 0;
+}
+
+```
+
+
+## 返回值优化输出结果
+
+```cpp
+Constructor called with value: 10
+Returned object data: 10
+```
+
+## 返回值优化代码解析
+createObject 函数返回一个临时对象 MyClass。在传统编译器中，这个临时对象的构造会涉及到拷贝操作。而在现代编译器中，RVO允许直接返回临时对象，从而减少拷贝开销。
