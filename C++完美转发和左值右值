@@ -1,0 +1,427 @@
+## 左值、右值
+
+### 概念1：
+
+左值：可以放到等号左边的东西叫左值。
+
+右值：不可以放到等号左边的东西就叫右值。
+
+### 概念2：
+
+左值：可以取地址并且有名字的东西就是左值。
+
+右值：不能取地址的没有名字的东西就是右值。
+
+### 举例：
+
+```cpp
+int a = b + c;
+```
+
+a是左值，有变量名，可以取地址，也可以放到等号左边, 表达式b+c的返回值是右值，没有名字且不能取地址，&(b+c)不能通过编译，而且也不能放到等号左边。
+
+```cpp
+int a = 4; // a是左值，4作为普通字面量是右值
+```
+
+左值一般有：
+
+函数名和变量名
+
+返回左值引用的函数调用
+
+前置自增自减表达式++i、--i
+
+由赋值表达式或赋值运算符连接的表达式(a=b, a += b等)
+
+解引用表达式*p
+
+字符串字面值"abcd"
+
+## 纯右值、将亡值
+纯右值和将亡值都属于右值。
+
+### 纯右值
+运算表达式产生的临时变量、不和对象关联的原始字面量、非引用返回的临时变量、lambda表达式等都是纯右值。
+
+### 举例：
+
+除字符串字面值外的字面值
+
+返回非引用类型的函数调用
+
+后置自增自减表达式i++、i--
+
+算术表达式(a+b, a*b, a&&b, a==b等)
+
+取地址表达式等(&a)
+
+### 将亡值
+将亡值是指C++11新增的和右值引用相关的表达式，通常指将要被移动的对象、T&&函数的返回值、std::move函数的返回值、转换为T&&类型转换函数的返回值，将亡值可以理解为即将要销毁的值，通过“盗取”其它变量内存空间方式获取的值，在确保其它变量不再被使用或者即将被销毁时，可以避免内存空间的释放和分配，延长变量值的生命周期，常用来完成移动构造或者移动赋值的特殊任务。
+
+### 举例：
+
+```cpp
+class A {
+    xxx;
+};
+A a;
+auto c = std::move(a); // c是将亡值
+auto d = static_cast<A&&>(a); // d是将亡值
+```
+
+### 左值引用、右值引用
+根据名字大概就可以猜到意思，左值引用就是对左值进行引用的类型，右值引用就是对右值进行引用的类型，他们都是引用，都是对象的一个别名，并不拥有所绑定对象的堆存，所以都必须立即初始化。
+
+type &name = exp; // 左值引用
+type &&name = exp; // 右值引用
+左值引用
+
+看代码：
+
+```cpp
+int a = 5;
+int &b = a; // b是左值引用
+b = 4;
+int &c = 10; // error，10无法取地址，无法进行引用
+const int &d = 10; // ok，因为是常引用，引用常量数字，这个常量数字会存储在内存中，可以取地址
+```
+
+可以得出结论：对于左值引用，等号右边的值必须可以取地址，如果不能取地址，则会编译失败，或者可以使用const引用形式，但这样就只能通过引用来读取输出，不能修改数组，因为是常量引用。
+
+右值引用
+
+如果使用右值引用，那表达式等号右边的值需要时右值，可以使用std::move函数强制把左值转换为右值。
+
+```cpp
+int a = 4;
+int &&b = a; // error, a是左值
+int &&c = std::move(a); // ok
+```
+
+## 完美转发
+
+完美转发指可以写一个接受任意实参的函数模板，并转发到其它函数，目标函数会收到与转发函数完全相同的实参，转发函数实参是左值那目标函数实参也是左值，转发函数实参是右值那目标函数实参也是右值。那如何实现完美转发呢，答案是使用std::forward()。
+
+## 完美转发参考代码一
+
+```cpp
+#include <iostream>
+#include <utility> // for std::forward and std::move
+
+using namespace std;
+
+void PrintV(int &t) {
+    cout << "left value " << endl;
+}
+
+void PrintV(int &&t) {
+    cout << "right value " << endl;
+}
+
+template<typename T>
+void Test(T &&t) {
+    // Calls PrintV with the parameter `t`
+    PrintV(t);
+
+    // Calls PrintV with `t` forwarded as the same value category as `T`
+    PrintV(std::forward<T>(t));
+
+    // Calls PrintV with `t` moved
+    PrintV(std::move(t));
+}
+
+int main() {
+    Test(1); // lvalue rvalue rvalue
+    std::cout << "one" << endl;
+
+    int a = 1;
+    Test(a); // lvalue lvalue rvalue
+    std::cout << "two" <<endl;
+
+    Test(std::forward<int>(a)); // lvalue rvalue rvalue
+    std::cout << "three" <<endl;
+
+    Test(std::forward<int&>(a)); // lvalue lvalue rvalue
+    std::cout << "four" <<endl;
+
+    Test(std::forward<int&&>(a)); // lvalue rvalue rvalue
+    std::cout << "five" <<endl;
+
+    return 0;
+}
+
+```
+### 完美转发参考代码一输出结果
+
+```cpp
+left value 
+right value 
+right value 
+one
+left value 
+left value 
+right value 
+two
+left value 
+right value 
+right value 
+three
+left value 
+left value 
+right value 
+four
+left value 
+right value 
+right value 
+five
+```
+
+### 完美转发代码功能概述
+
+这段代码主要演示了C++中值类别（左值和右值）的处理，以及std::forward和std::move在模板编程中的用法。通过PrintV函数，代码分别打印参数是左值还是右值。
+
+
+###  核心函数说明
+**PrintV 函数**
+
+```cpp
+void PrintV(int &t) {
+    cout << "lvalue" << endl;
+}
+
+void PrintV(int &&t) {
+    cout << "rvalue" << endl;
+}
+
+```
+PrintV(int &t)：用于处理左值引用，只有左值才能匹配。
+PrintV(int &&t)：用于处理右值引用，只有右值才能匹配。
+
+**Test 模板函数**
+
+```cpp
+template<typename T>
+void Test(T &&t) {
+    PrintV(t);
+    PrintV(std::forward<T>(t));
+    PrintV(std::move(t));
+}
+
+```
+
+PrintV(t)：直接将t传递给PrintV。由于t的类型是T&&，但在调用PrintV时会被推导为左值（因为t有名字），所以匹配左值版本的PrintV。
+PrintV(std::forward<T>(t))：std::forward会根据T的实际类型决定将t作为左值或右值传递。如果T是右值引用类型（如int&&），std::forward会保持t是右值；否则，它会保持t为左值。
+PrintV(std::move(t))：std::move会将t强制转换为右值，因此总是调用右值版本的PrintV。
+
+
+### main 函数分析
+
+```cpp
+int main() {
+    Test(1); // lvalue rvalue rvalue
+
+    int a = 1;
+    Test(a); // lvalue lvalue rvalue
+
+    Test(std::forward<int>(a)); // lvalue rvalue rvalue
+    Test(std::forward<int&>(a)); // lvalue lvalue rvalue
+    Test(std::forward<int&&>(a)); // lvalue rvalue rvalue
+
+    return 0;
+}
+
+```
+
+**1. Test(1)**
+
+1是一个右值：
+PrintV(t)：t有名字，被视为左值，输出lvalue。
+PrintV(std::forward<T>(t))：T推导为int，std::forward将t视为右值，输出rvalue。
+PrintV(std::move(t))：强制将t视为右值，输出rvalue。
+结果：lvalue rvalue rvalue
+
+**2. Test(a)**
+
+a 是一个左值：
+PrintV(t)：t是左值，输出lvalue。
+PrintV(std::forward<T>(t))：T推导为int&，std::forward保持t为左值，输出lvalue。
+PrintV(std::move(t))：强制将t视为右值，输出rvalue。
+结果：lvalue lvalue rvalue
+
+ **3. Test(std::forward<int>(a))**
+
+std::forward<int>(a)会将a视为右值：
+PrintV(t)：t有名字，被视为左值，输出lvalue。
+PrintV(std::forward<T>(t))：T推导为int，std::forward将t视为右值，输出rvalue。
+PrintV(std::move(t))：强制将t视为右值，输出rvalue。
+结果：lvalue rvalue rvalue
+
+**4. Test(std::forward<int&>(a))**
+
+std::forward<int&>(a)会保持a为左值：
+PrintV(t)：t是左值，输出lvalue。
+PrintV(std::forward<T>(t))：T推导为int&，std::forward保持t为左值，输出lvalue。
+PrintV(std::move(t))：强制将t视为右值，输出rvalue。
+结果：lvalue lvalue rvalue
+
+**5. Test(std::forward<int&&>(a))**
+
+std::forward<int&&>(a)会将a视为右值：
+PrintV(t)：t有名字，被视为左值，输出lvalue。
+PrintV(std::forward<T>(t))：T推导为int&&，std::forward保持t为右值，输出rvalue。
+PrintV(std::move(t))：强制将t视为右值，输出rvalue。
+结果：lvalue rvalue rvalue
+
+
+## 完美转发参考代码二
+
+```cpp
+#include <iostream>
+#include <utility> // std::forward
+
+// 示例目标函数
+void process(int& x) {
+    std::cout << "Left value reference: " << x << std::endl;
+}
+
+void process(const int& x) {
+    std::cout << "Const Left value reference: " << x << std::endl;
+}
+
+void process(int&& x) {
+    std::cout << "Right value reference: " << x << std::endl;
+}
+
+// 转发函数模板
+template <typename T>
+void forwarder(T&& arg) {
+    // 使用 std::forward 将参数完美转发
+    process(std::forward<T>(arg));
+}
+
+int main() {
+    int a = 10;
+
+    std::cout << "Passing left value:" << std::endl;
+    forwarder(a); // 转发左值
+
+    std::cout << "Passing const left value:" << std::endl;
+    const int b = 20;
+    forwarder(b); // 转发常量左值
+
+    std::cout << "Passing right value:" << std::endl;
+    forwarder(30); // 转发右值
+
+    std::cout << "Passing modified right value:" << std::endl;
+    forwarder(std::move(a)); // 使用 std::move 将左值转为右值
+
+    return 0;
+}
+
+```
+
+### 完美转发参考代码二输出结果
+
+```cpp
+Passing left value:
+Left value reference: 10
+Passing const left value:
+Const Left value reference: 20
+Passing right value:
+Right value reference: 30
+Passing modified right value:
+Right value reference: 10
+```
+
+### 代码解析
+1. 目标函数 process:
+定义了三种不同版本的 process 函数，用于接收左值引用、常量左值引用和右值引用。
+
+2. 转发函数模板 forwarder:
+使用模板参数 T&& 接收任意类型的参数。
+通过 std::forward<T>(arg) 实现完美转发，将参数的值类别保留下来。
+
+3. 测试代码:
+演示了左值、常量左值、右值以及通过 std::move 转换后的右值的转发情况。
+
+### 关键点
+1. 完美转发的核心是模板参数 T&&（称为万能引用）和 std::forward。
+2. std::forward<T> 会根据参数类型决定是保留左值还是右值的属性：
+1）如果 T 是左值引用类型，则参数会按左值引用传递；
+2）如果 T 是右值引用类型，则参数会按右值引用传递。
+
+
+## 完美转发参考代码三
+```cpp
+#include <iostream>
+#include <utility> // for std::forward
+
+// 一个目标函数，用来接收参数
+void process(int& x) {
+    std::cout << "Left value reference processed: " << x << std::endl;
+}
+
+void process(const int& x) {
+    std::cout << "Const left value reference processed: " << x << std::endl;
+}
+
+void process(int&& x) {
+    std::cout << "Right value reference processed: " << x << std::endl;
+}
+
+// 包装函数，使用特性转发
+template <typename T>
+void wrapper(T&& arg) {
+    // 使用 std::forward 保留参数的值类别
+    process(std::forward<T>(arg));
+}
+
+int main() {
+    int a = 10;
+
+    // 测试左值引用
+    wrapper(a); // 调用 process(int&)
+
+    // 测试 const 左值引用
+    const int b = 20;
+    wrapper(b); // 调用 process(const int&)
+
+    // 测试右值引用
+    wrapper(30); // 调用 process(int&&)
+
+    // 测试 std::move 的结果（右值）
+    wrapper(std::move(a)); // 调用 process(int&&)
+
+    return 0;
+}
+
+```
+
+### 完美转发参考代码三输出结果
+
+```cpp
+Left value reference processed: 10
+Const left value reference processed: 20
+Right value reference processed: 30
+Right value reference processed: 10
+```
+
+### 代码说明
+1. 目标函数 process:
+定义了三个重载版本，分别接收 int&（左值引用）、const int&（常量左值引用）、int&&（右值引用）。
+
+2. 包装函数 wrapper:
+1）使用模板参数 T&& 和 std::forward 实现特性转发。
+2）T&& 是一个转发引用（forwarding reference），可以绑定到左值和右值。
+3）std::forward<T>(arg) 会根据传入参数的类型（左值或右值）进行条件转发。
+
+3. main 函数:
+测试不同类型的参数传递给 wrapper，观察特性转发如何将参数的值类别正确地传递给目标函数。
+
+
+## 完美转发总结
+
+std::forward 用于在模板中精确传递值类别（左值或右值）。
+std::move 用于将变量强制转换为右值。
+在模板中处理值类别时，需要小心参数传递方式，确保符合预期的行为。
